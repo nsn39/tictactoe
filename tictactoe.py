@@ -1,5 +1,6 @@
 # Import modules
 import os
+import copy
 import pygame as pg
 from enum import Enum
 from math import floor
@@ -59,6 +60,17 @@ class Square(pg.sprite.Sprite):
         top = y_ind * 100 + 150
         left = x_ind * 100 + 150
         self.rect.topleft = top, left
+
+class Move:
+    """
+        Represent a move using player type and square no.
+    """
+    def __init__(self, square_no, player_type):
+        self.square_no = square_no
+        self.player_type = player_type
+    
+    def get_move(self):
+        return self.square_no, self.player_type
 
 # Class for board game
 class Board:
@@ -132,8 +144,44 @@ class Board:
 
         return ans
 
+    def is_full(self):
+        """
+            Checks if the board is already full or not.
+        """
+        ans = True
+        for i in range(9):
+            if self.squares[i] == SquareType.EMPTY:
+                ans = False
+                break
+        return ans
+
+    def empty_positions(self):
+        """
+            Return a list of empty positions on the board.
+        """
+        ans = []
+        for i in range(9):
+            if self.squares[i] == SquareType.EMPTY:
+                ans.append(i)
+        return ans
+
     def get_square(self, sq_index):
         return self.squares[sq_index]
+
+    def get_board_state(self):
+        """
+            Return the current state of our board.
+        """
+        b_state = self.squares.copy()
+
+def new_board_state(board_state, player_move):
+    """
+        Return a new board object based on given board state and Move object.
+    """
+    new_board = copy.deepcopy(board_state)
+    square_no, player_type = player_move.get_move()
+    new_board.set_square(square_no, player_type)
+    return new_board
 
 # Defining the main game
 def main():
@@ -166,7 +214,8 @@ def main():
     p_turn = 0
     # Start the infinite loop
     going = True
-    
+    recent = True
+
     while going:
         clock.tick(60)
         # Checking the event queue
@@ -181,17 +230,19 @@ def main():
                 x_pos = floor((pos[1] - 150) / 100)
                 clicked_square = ((3 * x_pos) + y_pos)
                 print("Clicked ", clicked_square)
-
+                
                 # Proceed forward if only clicked on a valid square
                 if clicked_square >=0 and clicked_square < 9 and board.get_square(clicked_square) == SquareType.EMPTY:
-                    # First find out the players whose turn is current one.
-                    if p_turn % 2 == 0:
-                        current_player = SquareType.CIRCLE
-                        text_content = "Player 2 Turn"
-                    else:
-                        current_player = SquareType.CROSS
-                        text_content = "Player 1 Turn"
-                    p_turn += 1
+                    # Human player is presumed to be a CROSS
+                    current_player = SquareType.CROSS
+                    text_content = "AI Turn" #"Player 2 Turn"
+                        
+                    # # Use the minimax function to get a new state.
+                    # current_player = SquareType.CIRCLE
+                    # best_move = minimax(board, current_player)
+                    # clicked_square = best_move.get_move()[0]
+                    # text_content = "Player 1 Turn"
+
                     # After the square is clicked. update the board status and add a sprite to the list
                     new_sprite = Square(clicked_square, current_player)
                     all_sprites.add(new_sprite)
@@ -206,6 +257,34 @@ def main():
                     # Update the text to be rendered
                     text = font.render(text_content, True, (10,10,10))
 
+                    # Set recent to True for AI to play the next turn.
+                    recent = True
+
+        # Check if there has been a recent play by CROSS, then AI will play the CIRCLE.
+        if recent:
+            #clock.tick(1500)
+            current_player = SquareType.CIRCLE
+            text_content = "Player 1 Turn"
+            best_move, score = minimax(board, current_player)
+            clicked_square, type_p = best_move.get_move()
+
+            # After the square is clicked. update the board status and add a sprite to the list
+            new_sprite = Square(clicked_square, current_player)
+            all_sprites.add(new_sprite)
+            # After that update the board status as well.
+            board.set_square(clicked_square, current_player)
+            # Check if we reached a win-state
+            if board.is_won() == True:
+                if board.winner == "Circle":
+                    text_content = "Circle won"
+                else:
+                    text_content = "Cross won"
+            # Update the text to be rendered
+            text = font.render(text_content, True, (10,10,10))
+
+            # Reset recent to False for AI to play the next turn.
+            recent = False
+
         # Blit the update text onto background
         background.fill(pg.Color("white"))
         background.blit(text, textpos)
@@ -217,6 +296,66 @@ def main():
         screen.blit(background, (0,0))
         all_sprites.draw(screen)
         pg.display.flip()
+
+
+def minimax(board_state, player):
+    """
+        Return a score of -1, 0 or +1 depending on the board state.
+        Also returns a legal move for the current player
+    """
+
+    # Check if the game is over 
+    if board_state.is_won():
+        if player == SquareType.CROSS:
+            # Previous turn was of CIRCLE, i.e. Circle won
+            return None, -1
+        elif player == SquareType.CIRCLE:
+            # Previous turn was of CROSS, i.e. Cross won
+            return None, +1
+    elif board_state.is_full():
+        # Board is already full and noone won
+        return None, 0
+
+
+    # First case: Maximizing player
+    if player == SquareType.CROSS:
+        MAX_VAL = -10
+
+        # For each empty position
+        blanks = board_state.empty_positions()
+
+        final_move = None
+        # Make a new move object for each blank position.
+        for square in blanks:
+            move = Move(square, player)
+            new_board = new_board_state(board_state, move)
+            new_move, temp_val = minimax(new_board, SquareType.CIRCLE)
+
+            if MAX_VAL <= temp_val:
+                MAX_VAL = temp_val
+                final_move = move
+
+        return final_move, MAX_VAL
+
+    # Second case: Minimizing player
+    elif player == SquareType.CIRCLE:
+        MIN_VAL = +10
+
+        # For each empty position
+        blanks = board_state.empty_positions()
+
+        final_move = None
+        # Make a new move object for each blank poisition
+        for square in blanks:
+            move = Move(square, player)
+            new_board = new_board_state(board_state, move)
+            new_move, temp_val = minimax(new_board, SquareType.CROSS)
+
+            if MIN_VAL >= temp_val:
+                MIN_VAL = temp_val
+                final_move = move
+
+        return final_move, MIN_VAL
 
 
 if __name__=="__main__":
