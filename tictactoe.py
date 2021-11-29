@@ -193,6 +193,7 @@ def main():
     # Creating the background
     background = pg.Surface(screen.get_size())
     background = background.convert()
+    background.fill((170, 238, 187))
 
     # Create the text to be rendered.
     if pg.font:
@@ -214,10 +215,35 @@ def main():
     p_turn = 0
     # Start the infinite loop
     going = True
-    recent = True
+    recent = False
 
     while going:
         clock.tick(60)
+
+        # Check if there has been a recent play by CROSS, then AI will play the CIRCLE.
+        if recent:
+            current_player = SquareType.CIRCLE
+            text_content = "Player 1 Turn"
+            best_move, score = minimax(board, current_player)
+            clicked_square, type_p = best_move.get_move()
+
+            # After the square is clicked. update the board status and add a sprite to the list
+            new_sprite = Square(clicked_square, current_player)
+            all_sprites.add(new_sprite)
+            # After that update the board status as well.
+            board.set_square(clicked_square, current_player)
+            # Check if we reached a win-state
+            if board.is_won() == True:
+                if board.winner == "Circle":
+                    text_content = "Circle won"
+                else:
+                    text_content = "Cross won"
+            # Update the text to be rendered
+            text = font.render(text_content, True, (10,10,10))
+
+            # Reset recent to False for AI to play the next turn.
+            recent = False
+
         # Checking the event queue
         for event in pg.event.get():
             if event.type == pg.QUIT:
@@ -260,31 +286,7 @@ def main():
                     # Set recent to True for AI to play the next turn.
                     recent = True
 
-        # Check if there has been a recent play by CROSS, then AI will play the CIRCLE.
-        if recent:
-            #clock.tick(1500)
-            current_player = SquareType.CIRCLE
-            text_content = "Player 1 Turn"
-            best_move, score = minimax(board, current_player)
-            clicked_square, type_p = best_move.get_move()
-
-            # After the square is clicked. update the board status and add a sprite to the list
-            new_sprite = Square(clicked_square, current_player)
-            all_sprites.add(new_sprite)
-            # After that update the board status as well.
-            board.set_square(clicked_square, current_player)
-            # Check if we reached a win-state
-            if board.is_won() == True:
-                if board.winner == "Circle":
-                    text_content = "Circle won"
-                else:
-                    text_content = "Cross won"
-            # Update the text to be rendered
-            text = font.render(text_content, True, (10,10,10))
-
-            # Reset recent to False for AI to play the next turn.
-            recent = False
-
+        
         # Blit the update text onto background
         background.fill(pg.Color("white"))
         background.blit(text, textpos)
