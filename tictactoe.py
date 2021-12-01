@@ -224,7 +224,7 @@ def main():
         if recent:
             current_player = SquareType.CIRCLE
             text_content = "Player 1 Turn"
-            best_move, score = minimax(board, current_player)
+            best_move, score = minimax(board, current_player, -10000, +10000)
             clicked_square, type_p = best_move.get_move()
 
             # After the square is clicked. update the board status and add a sprite to the list
@@ -258,7 +258,7 @@ def main():
                 print("Clicked ", clicked_square)
                 
                 # Proceed forward if only clicked on a valid square
-                if clicked_square >=0 and clicked_square < 9 and board.get_square(clicked_square) == SquareType.EMPTY:
+                if clicked_square >=0 and clicked_square < 9 and board.get_square(clicked_square) == SquareType.EMPTY and board.is_full() != True and board.is_won() != True:
                     # Human player is presumed to be a CROSS
                     current_player = SquareType.CROSS
                     text_content = "AI Turn" #"Player 2 Turn"
@@ -300,10 +300,11 @@ def main():
         pg.display.flip()
 
 
-def minimax(board_state, player):
+def minimax(board_state, player, alpha, beta):
     """
         Return a score of -1, 0 or +1 depending on the board state.
         Also returns a legal move for the current player
+        Uses alpha-beta pruning to cut out unnecessary branches.
     """
 
     # Check if the game is over 
@@ -331,11 +332,15 @@ def minimax(board_state, player):
         for square in blanks:
             move = Move(square, player)
             new_board = new_board_state(board_state, move)
-            new_move, temp_val = minimax(new_board, SquareType.CIRCLE)
+            new_move, temp_val = minimax(new_board, SquareType.CIRCLE, alpha, beta)
 
             if MAX_VAL <= temp_val:
                 MAX_VAL = temp_val
                 final_move = move
+
+            alpha = max(alpha, temp_val)
+            if beta <= alpha:
+                break
 
         return final_move, MAX_VAL
 
@@ -351,11 +356,15 @@ def minimax(board_state, player):
         for square in blanks:
             move = Move(square, player)
             new_board = new_board_state(board_state, move)
-            new_move, temp_val = minimax(new_board, SquareType.CROSS)
+            new_move, temp_val = minimax(new_board, SquareType.CROSS, alpha, beta)
 
             if MIN_VAL >= temp_val:
                 MIN_VAL = temp_val
                 final_move = move
+
+            beta = min(beta, temp_val)
+            if beta <= alpha:
+                break
 
         return final_move, MIN_VAL
 
